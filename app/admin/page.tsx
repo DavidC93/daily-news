@@ -17,9 +17,16 @@ export default async function AdminDashboard() {
         <LogoutButton />
       </div>
 
+      <Link
+        href="/admin/publish"
+        className="flex items-center justify-center h-12 mb-8 rounded-sm bg-ink text-paper font-medium hover:opacity-90"
+      >
+        פרסום מהדורה חדשה
+      </Link>
+
       {editions.length === 0 && (
         <p className="text-ink-soft">
-          אין עדיין מהדורות. יש ליצור מהדורה ראשונה דרך POST /api/news.
+          אין עדיין מהדורות.
         </p>
       )}
 

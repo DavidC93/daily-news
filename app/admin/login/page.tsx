@@ -20,7 +20,9 @@ export default function AdminLoginPage() {
     });
     setLoading(false);
     if (res.ok) {
-      router.push("/admin");
+      // Only same-site admin paths, so ?next= can't become an open redirect.
+      const next = new URLSearchParams(window.location.search).get("next");
+      router.push(next && /^\/admin(\/|$)/.test(next) ? next : "/admin");
       router.refresh();
     } else {
       const data = await res.json().catch(() => ({}));

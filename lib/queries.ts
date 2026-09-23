@@ -142,6 +142,12 @@ export async function getLatestEdition(): Promise<Edition | null> {
   return loadEditionByRow(rows[0]);
 }
 
+export async function editionExists(date: string): Promise<boolean> {
+  const sql = getSql();
+  const rows = await sql`SELECT 1 FROM editions WHERE date = ${date}`;
+  return rows.length > 0;
+}
+
 export async function getLatestEditionDate(): Promise<string | null> {
   const sql = getSql();
   const rows = (await sql`SELECT date FROM editions ORDER BY date DESC LIMIT 1`) as unknown as Pick<EditionRow, "date">[];
