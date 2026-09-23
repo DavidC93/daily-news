@@ -219,6 +219,27 @@ export async function createEdition(input: EditionInput): Promise<Edition> {
     );
   }
 
+  // Article ids are globally unique, but feeds naturally reuse ids like
+  // "technology-001" every day. Suffix colliding ids with the edition date.
+  let leadStoryId = input.leadStoryId ?? null;
+  const incomingIds = articleRows.map((a) => a.id);
+  if (incomingIds.length > 0) {
+    const taken = (await sql`
+      SELECT id FROM articles WHERE id = ANY(${incomingIds})
+    `) as unknown as { id: string }[];
+    if (taken.length > 0) {
+      const takenSet = new Set(taken.map((r) => r.id));
+      for (const a of articleRows) {
+        if (!takenSet.has(a.id)) continue;
+        let next = `${a.id}-${input.date}`;
+        while (usedIds.has(next)) next = randomId(a.category);
+        usedIds.add(next);
+        if (leadStoryId === a.id) leadStoryId = next;
+        a.id = next;
+      }
+    }
+  }
+
   // Reserve the edition id up front so article rows can reference it inside
   // the same non-interactive transaction (edition/article FK is DEFERRED,
   // so insert order across the batch doesn't matter).
@@ -227,7 +248,7 @@ export async function createEdition(input: EditionInput): Promise<Edition> {
   const statements = [
     sql`
       INSERT INTO editions (id, date, title, daily_summary, lead_story_id)
-      VALUES (${editionId}, ${input.date}, ${input.title}, ${input.dailySummary ?? ""}, ${input.leadStoryId ?? null})
+      VALUES (${editionId}, ${input.date}, ${input.title}, ${input.dailySummary ?? ""}, ${leadStoryId})
     `,
     ...articleRows.map(
       (a) => sql`
@@ -246,7 +267,13 @@ export async function createEdition(input: EditionInput): Promise<Edition> {
   try {
     await sql.transaction(statements);
   } catch (err) {
-    if (err instanceof Error && "code" in err && err.code === "23505") {
+    if (
+      err instanceof Error &&
+      "code" in err &&
+      err.code === "23505" &&
+      "constraint" in err &&
+      err.constraint === "editions_date_key"
+    ) {
       throw Object.assign(new Error(`Edition for date ${input.date} already exists`), {
         code: "EDITION_EXISTS",
       });
